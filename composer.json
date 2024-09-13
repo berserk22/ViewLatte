@@ -1,6 +1,7 @@
 {
   "name": "skeleton-app/view-latte",
   "description": "SkeletonApp Module ViewLatte",
+  "type": "modules",
   "require": {
     "php": ">=8.2",
     "skeleton-app/view": "@dev",
