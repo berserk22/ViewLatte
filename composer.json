@@ -3,9 +3,7 @@
   "description": "SkeletonApp Module ViewLatte",
   "type": "modules",
   "require": {
-    "php": ">=8.2",
-    "skeleton-app/view": "@dev",
-    "latte/latte": "3.*"
+    "php": ">=8.2"
   },
   "autoload": {
     "psr-4": {
