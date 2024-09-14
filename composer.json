@@ -1,6 +1,7 @@
 {
   "name": "skeleton-app/view-latte",
   "description": "SkeletonApp Module ViewLatte",
+  "type": "modules",
   "require": {
     "php": ">=8.2",
     "skeleton-app/view": "@dev",
@@ -8,12 +9,12 @@
   },
   "autoload": {
     "psr-4": {
-      "Modules\\ViewLatte\\": "/"
+      "Modules\\ViewLatte\\": "/modules/ViewLatte/"
     }
   },
   "extra": {
     "branch-alias": {
-      "dev-master": "master"
+      "dev-main": "dev"
     }
   },
   "minimum-stability": "dev",
