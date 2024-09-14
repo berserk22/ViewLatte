@@ -2,8 +2,16 @@
   "name": "skeleton-app/view-latte",
   "description": "SkeletonApp Module ViewLatte",
   "type": "modules",
+  "repositories": [
+    {
+      "name": "skeleton-app/view",
+      "type": "vcs",
+      "url":  "https://github.com/berserk22/View.git"
+    }
+  ],
   "require": {
-    "php": ">=8.2"
+    "php": ">=8.2",
+    "skeleton-app/view": "dev-dev"
   },
   "autoload": {
     "psr-4": {
