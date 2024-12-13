@@ -9,6 +9,7 @@ namespace Modules\ViewLatte;
 
 use DI\DependencyException;
 use DI\NotFoundException;
+use Exception;
 use Latte\Bridges\Tracy\TracyExtension;
 use Latte\Engine;
 use Latte\Loaders\FileLoader;
@@ -42,25 +43,54 @@ class LatteView extends ViewManager implements ViewInterface {
     ];
 
     /**
+     * @var array
+     */
+    private static array $loadedPlugins = [];
+
+    /**
      * @return void
      */
     public function loadPlugins(): void {
+        $this->viewer->setLocale("de");
         foreach ($this->func as $func){
-            $this->viewer->addFunction($func, fn(mixed ...$params) => $func(...$params));
+            $this->viewer->addFunction($func, fn(mixed ...$params) => $this->lazyLoadFunction($func, ...$params));
         }
         foreach ($this->plugins as $name => $plugin){
-            if (class_exists($plugin)){
-                if (method_exists($plugin, 'setContainer')) {
-                    $class = new $plugin($this);
-                }
-                else {
-                    $class = new $plugin();
-                }
-                $this->viewer->addFunction($name, function(mixed ...$params) use ($class){
-                    return $class->process(...$params);
-                });
+            $this->viewer->addFunction($name, fn(mixed ...$params) => $this->lazyLoadPlugin($name, $plugin, ...$params));
+        }
+    }
+
+    /**
+     * @param string $func
+     * @param mixed ...$params
+     * @return mixed
+     */
+    private function lazyLoadFunction(string $func, mixed ...$params): mixed {
+        // Подгружаем и сразу выполняем
+        return $func(...$params);
+    }
+
+    /**
+     * @param string $name
+     * @param string $pluginClass
+     * @param mixed ...$params
+     * @return mixed
+     * @throws Exception
+     */
+    private function lazyLoadPlugin(string $name, string $pluginClass, mixed ...$params): mixed {
+        if (!isset(self::$loadedPlugins[$name])) {
+            if (class_exists($pluginClass)) {
+                // Инициализируем плагин
+                $class = method_exists($pluginClass, 'setContainer')
+                    ? new $pluginClass($this)
+                    : new $pluginClass();
+                self::$loadedPlugins[$name] = $class;
+            } else {
+                throw new Exception("Plugin class $pluginClass not found for $name");
             }
         }
+        // Выполняем метод process для плагина
+        return self::$loadedPlugins[$name]->process(...$params);
     }
 
     /**
@@ -92,6 +122,15 @@ class LatteView extends ViewManager implements ViewInterface {
         $this->viewer = new Engine();
         $this->viewer->addExtension(new TracyExtension());
         $this->viewer->setLoader(new FileLoader($this->path));
+
+        /*$cachePath = ROOT_DIR.'cache/template'; // или другой путь, например, /tmp/latte
+        if (!is_dir($cachePath)) {
+            mkdir($cachePath, 0777, true);
+        }
+        $this->viewer->setLocale("de");
+        $this->viewer->setAutoRefresh(false);
+        $this->viewer->setTempDirectory($cachePath);*/
+
         $this->loadPlugins();
     }
 
@@ -140,13 +179,8 @@ class LatteView extends ViewManager implements ViewInterface {
         }
 
         // HTML Compressor
-        if ($this->config['view']['compressor']){
-            $content=str_replace(["\r","\n","\t","\f","\0","\x0B"], "", $content);
-            $content=preg_replace("/<!--(.*?)-->/", "", $content, -1);
-            $content=preg_replace(
-                "/^>\s<$/",
-                "",
-                preg_replace("/\s+/", " ", $content, -1), -1);
+        if ($this->config['view']['compressor']) {
+            $content = $this->compress($content);
         }
 
         $response->write($content);
@@ -208,12 +242,7 @@ class LatteView extends ViewManager implements ViewInterface {
 
         // HTML Compressor
         if ($this->config['view']['compressor']){
-            $content=str_replace(["\r","\n","\t","\f","\0","\x0B"], "", $content);
-            $content=preg_replace("/<!--(.*?)-->/", "", $content, -1);
-            $content=preg_replace(
-                "/^>\s<$/",
-                "",
-                preg_replace("/\s+/", " ", $content, -1), -1);
+            $content = $this->compress($content);
         }
 
         $response->write($content);
@@ -258,7 +287,9 @@ class LatteView extends ViewManager implements ViewInterface {
             $src_match[1][0] = $imageModel->getCompressedImage($src_match[1][0], 600);
         }
 
-        $tmp_img = $this->replaceAttributes($tmp_img, $src_match, $class, $element);
+        if (!str_contains($class, "nolazy")){
+            $tmp_img = $this->replaceAttributes($tmp_img, $src_match, $class, $element);
+        }
         return str_replace("alt=\"\"", "alt=\"Content Image\"", $tmp_img);
     }
 
@@ -301,5 +332,27 @@ class LatteView extends ViewManager implements ViewInterface {
                 $img
             );
         }
+    }
+
+    /**
+     * @param string $content
+     * @return string
+     */
+    private function compress(string $content): string {
+         return preg_replace(
+            [
+                "/\r|\n|\t|\f|\0|\x0B/",     // Убираем переносы строк, табы и спецсимволы
+                "/<!--.*?-->/s",             // Убираем HTML-комментарии
+                "/>\s+</",                   // Убираем пробелы между HTML-тегами
+                "/\s{2,}/"                   // Убираем избыточные пробелы
+            ],
+            [
+                "",
+                "",
+                "><",
+                " "
+            ],
+            $content
+        );
     }
 }
