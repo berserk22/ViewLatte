@@ -15,7 +15,7 @@ use Latte\Engine;
 use Latte\Loaders\FileLoader;
 use Modules\View\ViewInterface;
 use Modules\View\ViewManager;
-use Slim\Http\Response;
+use Slim\Psr7\Response;
 
 class LatteView extends ViewManager implements ViewInterface {
 
@@ -58,6 +58,9 @@ class LatteView extends ViewManager implements ViewInterface {
         foreach ($this->plugins as $name => $plugin){
             $this->viewer->addFunction($name, fn(mixed ...$params) => $this->lazyLoadPlugin($name, $plugin, ...$params));
         }
+        $this->viewer->addFunction("decode", function ($s) {
+            return html_entity_decode((string)$s, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        });
     }
 
     /**
@@ -108,30 +111,46 @@ class LatteView extends ViewManager implements ViewInterface {
     }
 
     /**
+     * @param array $plugins
      * @return void
      */
-    public function beforInit(): void {
-        $this->path = ROOT_DIR.$this->config['template']['path'].DIRECTORY_SEPARATOR.$this->config['template']['name'];
-        $this->setLayout($this->config['template']['layout'].$this->fileType);
+    public function setPlugins(array $plugins = []): void {
+        parent::setPlugins($plugins);
+        if (isset($this->viewer)) {
+            foreach ($plugins as $name => $plugin) {
+                $this->viewer->addFunction($name, fn(mixed ...$params) => $this->lazyLoadPlugin($name, $plugin, ...$params));
+            }
+        }
     }
 
     /**
-     * @return void
+     * @return LatteView
      */
-    public function initView(): void {
+    public function beforInit(): LatteView {
+        $this->path = ROOT_DIR.$this->config['template']['path'].DIRECTORY_SEPARATOR.$this->config['template']['name'];
+        $this->setLayout($this->config['template']['layout'].$this->fileType);
+        return $this;
+    }
+
+    /**
+     * @return LatteView
+     */
+    public function initView(): LatteView {
         $this->viewer = new Engine();
         $this->viewer->addExtension(new TracyExtension());
         $this->viewer->setLoader(new FileLoader($this->path));
 
-        /*$cachePath = ROOT_DIR.'cache/template'; // или другой путь, например, /tmp/latte
-        if (!is_dir($cachePath)) {
-            mkdir($cachePath, 0777, true);
-        }
+        $cachePath = ROOT_DIR.'cache/template'; // или другой путь, например, /tmp/latte
+        /*if (!is_dir($cachePath)) {
+            mkdir($cachePath, 0755, true);
+        }*/
         $this->viewer->setLocale("de");
         $this->viewer->setAutoRefresh(false);
-        $this->viewer->setTempDirectory($cachePath);*/
+        $this->viewer->setStrictTypes(false);
+        //$this->viewer->setTempDirectory($cachePath);
 
         $this->loadPlugins();
+        return $this;
     }
 
     /**
@@ -154,7 +173,6 @@ class LatteView extends ViewManager implements ViewInterface {
      * @return Response
      */
     public function render(Response $response, mixed $template = '', array $data = []): Response {
-        $this->initView();
         $this->setVariables($data);
         $status = 200;
 
@@ -183,7 +201,7 @@ class LatteView extends ViewManager implements ViewInterface {
             $content = $this->compress($content);
         }
 
-        $response->write($content);
+        $response->getBody()->write($content);
         return $response->withStatus($status)->withHeader('Content-Type', 'text/html');
     }
 
@@ -193,7 +211,7 @@ class LatteView extends ViewManager implements ViewInterface {
      * @return string
      */
     public function getHtml(mixed $template = '', array $data = []): string {
-        $this->initView();
+
         $this->setVariables($data);
         $this->template=$template.$this->fileType;
         if (str_contains($this->template, 'error')){
@@ -223,7 +241,6 @@ class LatteView extends ViewManager implements ViewInterface {
      * @return Response
      */
     public function fetch(Response $response, mixed $template = '', array $data = []): Response {
-        $this->initView();
         $this->setVariables($data);
 
         if (is_file($this->path.DIRECTORY_SEPARATOR.$template.$this->fileType)) {
@@ -245,7 +262,7 @@ class LatteView extends ViewManager implements ViewInterface {
             $content = $this->compress($content);
         }
 
-        $response->write($content);
+        $response->getBody()->write($content);
         return $response;
     }
 
@@ -328,7 +345,7 @@ class LatteView extends ViewManager implements ViewInterface {
         } else {
             return str_replace(
                 $src_match[0][0],
-                "data-src=\"" . $src_match[1][0] . "\" src=\"" . $this->src . "\" class=\"$class\" loading='lazy'",
+                "src=\"" . $src_match[1][0] . "\" class=\"$class\" loading='eager' fetchpriority='high' decoding='async'",
                 $img
             );
         }

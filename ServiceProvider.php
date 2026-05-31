@@ -8,23 +8,21 @@
 namespace Modules\ViewLatte;
 
 use Core\Module\Provider;
-use DI\DependencyException;
-use DI\NotFoundException;
 
 class ServiceProvider extends Provider {
 
     protected string $viewManager = "ViewManager::View";
 
     /**
-     * @throws DependencyException
-     * @throws NotFoundException
+     * @return void
      */
     public function beforeInit(): void {
         $container = $this->getContainer();
         if (!$container->has($this->viewManager)){
-            $container->set($this->viewManager, new LatteView($this));
-            $container->get($this->viewManager)->registry();
-            $container->get($this->viewManager)->beforInit();
+            $view = new LatteView($this);
+            $view->registry();
+            $view->beforInit();
+            $container->set($this->viewManager, $view->initView());
         }
     }
 
