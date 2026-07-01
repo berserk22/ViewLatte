@@ -141,13 +141,13 @@ class LatteView extends ViewManager implements ViewInterface {
         $this->viewer->setLoader(new FileLoader($this->path));
 
         $cachePath = ROOT_DIR.'cache/template'; // или другой путь, например, /tmp/latte
-        /*if (!is_dir($cachePath)) {
+        if (!is_dir($cachePath)) {
             mkdir($cachePath, 0755, true);
-        }*/
+        }
         $this->viewer->setLocale("de");
-        $this->viewer->setAutoRefresh(false);
+        /*$this->viewer->setAutoRefresh(false);
         $this->viewer->setStrictTypes(false);
-        //$this->viewer->setTempDirectory($cachePath);
+        $this->viewer->setTempDirectory($cachePath);*/
 
         $this->loadPlugins();
         return $this;
@@ -226,7 +226,7 @@ class LatteView extends ViewManager implements ViewInterface {
      * @param string $tmp_path
      * @return string
      */
-    public function getHtmlFromContent(mixed $content, array $data = [], string $tmp_path = "tmp/"): string {
+    public function getHtmlFromContent(mixed $content, array $data = [], string $tmp_path = ""): string {
         $template = $tmp_path."tmp_".time();
         file_put_contents($this->path.DIRECTORY_SEPARATOR.$template.$this->fileType, $content);
         $tmp_content = $this->getHtml($template, $data);
